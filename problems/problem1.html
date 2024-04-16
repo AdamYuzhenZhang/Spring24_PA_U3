@@ -21,6 +21,8 @@
 <body>
 <script type="module">
     import {ThreeEngine} from "../js/utils/utils_three.js";
+    import {get_default_lil_gui, refresh_displays} from "../js/utils/utils_three.js";
+    import {add_matrix_matrix, mul_matrix_matrix, mul_matrix_scalar, transpose} from "../js/utils/utils_math.js";
 
     // todo: create a visualization that demonstrates your knowledge of displacement-based
     // todo: distance over SE(3).  Note that this will use your logarithm solution from PS_U3,
@@ -68,6 +70,181 @@
 
         return adjugate;
     }
+
+    let engine = ThreeEngine.new_default_3d();
+    let settings = {
+        theta1_1: 0,
+        theta2_1: 0,
+        theta3_1: 0,
+        tx_1: 0,
+        ty_1: 0,
+        tz_1: 0,
+        theta1_2: 0,
+        theta2_2: 0,
+        theta3_2: 0,
+        tx_2: 0,
+        ty_2: 0,
+        tz_2: 0,
+        dispBasedDis: "0"
+    }
+    let actions = {
+        reset1: () => {
+            settings.theta1_1 = 0;
+            settings.theta2_1 = 0;
+            settings.theta3_1 = 0;
+            settings.tx_1 = 0;
+            settings.ty_1 = 0;
+            settings.tz_1 = 0;
+            refresh_displays(gui);
+        },
+        reset2: () => {
+            settings.theta1_2 = 0;
+            settings.theta2_2 = 0;
+            settings.theta3_2 = 0;
+            settings.tx_2 = 0;
+            settings.ty_2 = 0;
+            settings.tz_2 = 0;
+            refresh_displays(gui);
+        }
+    }
+    let gui = get_default_lil_gui();
+    gui.add(settings, 'theta1_1', -Math.PI * 2, Math.PI * 2).name('theta1_1');
+    gui.add(settings, 'theta2_1', -Math.PI * 2, Math.PI * 2).name('theta2_1');
+    gui.add(settings, 'theta3_1', -Math.PI * 2, Math.PI * 2).name('theta3_1');
+    gui.add(settings, 'tx_1', -2, 2).name('tx_1');
+    gui.add(settings, 'ty_1', -2, 2).name('ty_1');
+    gui.add(settings, 'tz_1', -2, 2).name('tz_1');
+    gui.add(actions, 'reset1');
+    gui.add(settings, 'theta1_2', -Math.PI * 2, Math.PI * 2).name('theta1_2');
+    gui.add(settings, 'theta2_2', -Math.PI * 2, Math.PI * 2).name('theta2_2');
+    gui.add(settings, 'theta3_2', -Math.PI * 2, Math.PI * 2).name('theta3_2');
+    gui.add(settings, 'tx_2', -2, 2).name('tx_2');
+    gui.add(settings, 'ty_2', -2, 2).name('ty_2');
+    gui.add(settings, 'tz_2', -2, 2).name('tz_2');
+    gui.add(actions, 'reset2');
+    gui.add(settings, 'dispBasedDis').name('disp based dis').disable();
+
+
+
+    function getR(theta1, theta2, theta3){
+        let r1 = [[1, 0, 0], [0, Math.cos(theta1), -Math.sin(theta1)], [0, Math.sin(theta1), Math.cos(theta1)]];
+        let r2 = [[Math.cos(theta2), 0, Math.sin(theta2)], [0,1,0], [-Math.sin(theta2), 0, Math.cos(theta2)]];
+        let r3 = [[Math.cos(theta3), -Math.sin(theta3), 0], [Math.sin(theta3), Math.cos(theta3), 0], [0,0,1]];
+        let r = mul_matrix_matrix(r1, mul_matrix_matrix(r2, r3));
+        return r;
+    }
+
+    function trace(m, size) {
+        let tr = 0;
+        for (let i = 0; i < size; i++) {
+            tr += m[i][i];
+        }
+        return tr;
+    }
+
+    engine.animation_loop(() => {
+
+        // get rotation matrix
+        let r1 = getR(settings.theta1_1, settings.theta2_1, settings.theta3_1);
+        let r2 = getR(settings.theta1_2, settings.theta2_2, settings.theta3_2);
+        // get translation matrix
+        let t1 = [[settings.tx_1], [settings.ty_1], [settings.tz_1]];
+        let t2 = [[settings.tx_2], [settings.ty_2], [settings.tz_2]];
+
+        // the x, y, z unit vectors
+        let x = [[1], [0], [0]];
+        let y = [[0], [1], [0]];
+        let z = [[0], [0], [1]];
+
+        // origins
+        let o1 = [settings.tx_1, settings.ty_1, settings.tz_1]
+        let o2 = [settings.tx_2, settings.ty_2, settings.tz_2]
+        // rotated axes
+        let x1 = mul_matrix_matrix(r1, x);
+        let y1 = mul_matrix_matrix(r1, y);
+        let z1 = mul_matrix_matrix(r1, z);
+        let x2 = mul_matrix_matrix(r2, x);
+        let y2 = mul_matrix_matrix(r2, y);
+        let z2 = mul_matrix_matrix(r2, z);
+        // move them to origin with translation
+        x1 = add_matrix_matrix(x1, o1);
+        y1 = add_matrix_matrix(y1, o1);
+        z1 = add_matrix_matrix(z1, o1);
+        x2 = add_matrix_matrix(x2, o2);
+        y2 = add_matrix_matrix(y2, o2);
+        z2 = add_matrix_matrix(z2, o2);
+        // draw vectors
+        engine.draw_debug_vector(o1, x1, 0.02, undefined, 0xff0000);
+        engine.draw_debug_vector(o1, y1, 0.02, undefined, 0x00ff00);
+        engine.draw_debug_vector(o1, z1, 0.02, undefined, 0x0000ff);
+        engine.draw_debug_vector(o2, x2, 0.02, undefined, 0xa30000);
+        engine.draw_debug_vector(o2, y2, 0.02, undefined, 0x00a300);
+        engine.draw_debug_vector(o2, z2, 0.02, undefined, 0x0000a3);
+
+        // calculate distance
+        // disp
+        let r1T = transpose(r1);
+        let t1T = mul_matrix_matrix(mul_matrix_scalar(r1T, -1), t1);
+        let r = mul_matrix_matrix(r1T, r2);
+        let t = add_matrix_matrix(mul_matrix_matrix(r1T, t2), t1T);
+
+        // use logarithm map
+        // get ln(r)
+        let trR = trace(r, 3);
+        let beta = Math.acos((trR - 1.0) / 2.0);
+        let lnR;
+        if (Math.abs(beta) < 0.0001){
+            let beta2 = beta*beta;
+            let num = (1.0/2.0 + beta2 / 12.0 + 7.0 * beta2 * beta2 / 720.0);
+            let matrix = add_matrix_matrix(r, mul_matrix_scalar(transpose(r), -1))
+            lnR = mul_matrix_scalar(matrix, num);
+        }
+        else if (Math.abs(beta - Math.PI) <= 0.0001){
+            lnR = [[0, -Math.PI * Math.sqrt(0.5 * (r[2][2] + 1)), Math.PI * Math.sqrt(0.5 * (r[1][1] + 1))], 
+                [Math.PI * Math.sqrt(0.5 * (r[2][2] + 1)), 0, -Math.PI * Math.sqrt(0.5 * (r[0][0] + 1))],
+                [-Math.PI * Math.sqrt(0.5 * (r[1][1] + 1)), Math.PI * Math.sqrt(0.5 * (r[0][0] + 1)), 0]];
+        }
+        else {
+            let num = beta / 2 * Math.sin(beta);
+            let matrix = add_matrix_matrix(r, mul_matrix_scalar(transpose(r), -1));
+            lnR = mul_matrix_scalar(matrix, num);
+        }
+        //console.log("lnR");
+        //console.log(lnR);
+
+        // get lnt
+        let p1;
+        let p2;
+        if (Math.abs(beta) < 0.0001){
+            let beta2 = beta*beta;
+            p1 = 0.5 - beta2 / 24.0 + beta2*beta2 / 720.0;
+            p2 = 1.0 / 0.6 - beta2 / 120.0 + beta2*beta2 / 5040.0;
+        } else {
+            p1 = (1 - Math.cos(beta)) / (beta*beta);
+            p2 = (beta - Math.sin(beta)) / (beta*beta*beta);
+        }
+        let I = [[1,0,0], [0,1,0], [0,0,1]];
+        let term2 = mul_matrix_scalar(lnR, p1);
+        let term3 = mul_matrix_scalar(mul_matrix_matrix(lnR, lnR), p2);
+        let lnT = add_matrix_matrix(I, term2);
+        lnT = add_matrix_matrix(lnT, term3);
+        lnT = matrix_inverse_3x3(lnT);
+        lnT = mul_matrix_matrix(lnT, t);
+        //console.log(lnT);
+
+        // calculate L2 norm
+        let a1 = lnR[2][1];
+        let a2 = lnR[0][2];
+        let a3 = lnR[1][0];
+        let a4 = lnT[0][0];
+        let a5 = lnT[1][0];
+        let a6 = lnT[2][0];
+        let dis = Math.sqrt(a1*a1 + a2*a2 + a3*a3 + a4*a4 + a5*a5 + a6*a6);
+
+        settings.dispBasedDis = dis.toString();
+        refresh_displays(gui);
+    });
+
 
 
 
