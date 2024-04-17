@@ -21,10 +21,137 @@
 <body>
 <script type="module">
     import {get_default_lil_gui, ThreeEngine, refresh_displays} from "../js/utils/utils_three.js";
+    import {add_matrix_matrix, unroll_matrix_to_list} from "../js/utils/utils_math.js";
+
 
     // todo: create a visualization that demonstrates your knowledge of quaternions.  This is intentionally
     // todo: open-ended.  Be as creative as you want, or feel free to recreate any of the visualizations
     // todo: found in Section 3.3.
+
+    // I applied quaternion rotation to two suzanne monkeys.
+    // The one on the left is set by Eular angles
+    // The one on the right is set directly by quaternion values
+
+    let engine = ThreeEngine.new_default_3d();
+    let gui = get_default_lil_gui();
+    let settings = {
+        // with eular angles
+        theta1: 0,
+        theta2: 0,
+        theta3: 0,
+        we: 1,
+        xe: 0,
+        ye: 0,
+        ze: 0,
+        // with quaternions
+        w: 1,
+        x: 0,
+        y: 0,
+        z: 0,
+    }
+    let actions = {
+        reset1: () => {
+            settings.theta1 = 0;
+            settings.theta2 = 0;
+            settings.theta3 = 0;
+            refresh_displays(gui);
+        },
+        reset2: () => {
+            settings.w = 1;
+            settings.x = 0;
+            settings.y = 0;
+            settings.z = 0;
+            refresh_displays(gui);
+        }
+    }
+    let eularGui = gui.addFolder("Quaternion Euler (Left)");
+    eularGui.add(settings, "theta1", -Math.PI, Math.PI).name("theta1");
+    eularGui.add(settings, "theta2", -Math.PI, Math.PI).name("theta2");
+    eularGui.add(settings, "theta3", -Math.PI, Math.PI).name("theta3");
+    eularGui.add(settings, "we").name("w").disable();
+    eularGui.add(settings, "xe").name("x").disable();
+    eularGui.add(settings, "ye").name("y").disable();
+    eularGui.add(settings, "ze").name("z").disable();
+    eularGui.add(actions, "reset1").name("reset euler");
+    let QuatGui = gui.addFolder("Quaternion Value (Right)");
+    QuatGui.add(settings, "w", -2, 2).name("w");
+    QuatGui.add(settings, "x", -2, 2).name("x");
+    QuatGui.add(settings, "y", -2, 2).name("y");
+    QuatGui.add(settings, "z", -2, 2).name("z");
+    QuatGui.add(actions, "reset2").name("reset value");
+
+    // add mesh
+    engine.add_suzanne_monkey_as_mesh_object();
+    engine.toggle_mesh_object_visibility(0);
+    engine.toggle_mesh_object_wireframe_visibility(0);
+    let ptsEuler = engine.get_local_vertex_positions_of_mesh_object_wireframe(0);
+    engine.add_suzanne_monkey_as_mesh_object();
+    engine.toggle_mesh_object_visibility(1);
+    engine.toggle_mesh_object_wireframe_visibility(1);
+    let ptsQuat = engine.get_local_vertex_positions_of_mesh_object_wireframe(1);
+
+    function mulQuaternion(q1, q2){
+
+        let w = q1[0]*q2[0]-q1[1]*q2[1]-q1[2]*q2[2]-q1[3]*q2[3];
+        let x = q1[0]*q2[1]+q1[1]*q2[0]+q1[2]*q2[3]-q1[3]*q2[2];
+        let y = q1[0]*q2[2]-q1[1]*q2[3]+q1[2]*q2[0]+q1[3]*q2[1];
+        let z = q1[0]*q2[3]+q1[1]*q2[2]-q1[2]*q2[1]+q1[3]*q2[0];
+        return [w, x, y, z];
+
+    }
+
+    engine.animation_loop(() => {
+        // rotate with quaternion euler angles
+        let q1 = [Math.cos(settings.theta1), Math.sin(settings.theta1), 0,0];
+        let q2 = [Math.cos(settings.theta2), 0, Math.sin(settings.theta2), 0];
+        let q3 = [Math.cos(settings.theta3), 0, 0, Math.sin(settings.theta3)];
+        let quatE = mulQuaternion(q1, q2);
+        quatE = mulQuaternion(quatE, q3);
+        let quatEC = [quatE[0], -quatE[1], -quatE[2], -quatE[3]]
+        //quatEC[0] = quatE[0];
+
+        // update gui
+        settings.we = quatE[0];
+        settings.xe = quatE[1];
+        settings.ye = quatE[2];
+        settings.ze = quatE[3];
+        refresh_displays(gui);
+
+        // new points
+        let newPtsEuler = []
+        ptsEuler.forEach(pt => {
+            let ptList = unroll_matrix_to_list(pt);
+            let ptQuat = [0, ptList[0], ptList[1], ptList[2]];
+            ptQuat = mulQuaternion(quatE, ptQuat);
+            ptQuat = mulQuaternion(ptQuat, quatEC);
+            let newPt = [ptQuat[1], ptQuat[2], ptQuat[3]];
+            newPt = add_matrix_matrix(newPt, [0, -1.5, 0]);
+            newPtsEuler.push(newPt);
+        })
+        engine.update_vertex_positions_of_mesh_object_wireframe(0, newPtsEuler);
+
+
+        // rotate with values of quaternion
+        let quatQ = [settings.w, settings.x, settings.y, settings.z];
+
+
+        let newPtsQuat = []
+        ptsQuat.forEach(pt => {
+            // rotate with quaternion
+            let ptList = unroll_matrix_to_list(pt);
+            let ptQuat = [0, ptList[0], ptList[1], ptList[2]];
+            ptQuat = mulQuaternion(quatQ, ptQuat);
+            let newPt = [ptQuat[1], ptQuat[2], ptQuat[3]];
+            // move
+            newPt = add_matrix_matrix(newPt, [0, 1.5, 0]);
+            newPtsQuat.push(newPt);
+        })
+        engine.update_vertex_positions_of_mesh_object_wireframe(1, newPtsQuat);
+        
+
+    });
+
+
 
 </script>
 </body>
