@@ -130,7 +130,7 @@
         let r1 = [[1, 0, 0], [0, Math.cos(theta1), -Math.sin(theta1)], [0, Math.sin(theta1), Math.cos(theta1)]];
         let r2 = [[Math.cos(theta2), 0, Math.sin(theta2)], [0,1,0], [-Math.sin(theta2), 0, Math.cos(theta2)]];
         let r3 = [[Math.cos(theta3), -Math.sin(theta3), 0], [Math.sin(theta3), Math.cos(theta3), 0], [0,0,1]];
-        let r = mul_matrix_matrix(r1, mul_matrix_matrix(r2, r3));
+        let r = mul_matrix_matrix(mul_matrix_matrix(r1, r2), r3);
         return r;
     }
 
